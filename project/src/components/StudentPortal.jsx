@@ -1,112 +1,163 @@
-import React from "react";
-import { Box, Grid, Card, CardActionArea, CardContent, Typography, Toolbar, AppBar, Button } from "@mui/material";
-import AssignmentIcon from "@mui/icons-material/Assignment";
-import SendIcon from "@mui/icons-material/Send";
-import FeedbackIcon from "@mui/icons-material/Feedback";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
-import { useNavigate, Outlet } from "react-router-dom";
-
-const bgShapeStyle = {
-  position: "absolute",
-  zIndex: 0,
-  width: 120,
-  height: 120,
-  background: "radial-gradient(circle, #f1f8e9 70%, transparent 100%)",
-  borderRadius: "50%",
-  top: "40px",
-  left: "70px",
-  opacity: 0.55,
-};
-const bgShapeStyle2 = {
-  position: "absolute",
-  zIndex: 0,
-  width: 140,
-  height: 140,
-  background: "radial-gradient(circle, #ffe0b2 80%, transparent 100%)",
-  borderRadius: "50%",
-  bottom: "55px",
-  right: "140px",
-  opacity: 0.45,
-};
-
-const portalOptions = [
-  {
-    label: "Assignments",
-    description: "See all your assignments and track deadlines.",
-    icon: <AssignmentIcon sx={{ fontSize: 38, color: "#1976d2" }}/>,
-    path: "assignments",
-    color: "#e3f2fd"
-  },
-  {
-    label: "Submit",
-    description: "Upload your assignment submissions easily.",
-    icon: <SendIcon sx={{ fontSize: 38, color: "#43a047" }}/>,
-    path: "submit",
-    color: "#f1f8e9"
-  },
-  {
-    label: "Feedback",
-    description: "Review feedback and grades from your teachers.",
-    icon: <FeedbackIcon sx={{ fontSize: 38, color: "#ef6c00" }}/>,
-    path: "feedback",
-    color: "#ffe0b2"
-  },
-  {
-    label: "Badges",
-    description: "Earn badges for excellent performance.",
-    icon: <EmojiEventsIcon sx={{ fontSize: 38, color: "#ff9800" }} />,
-    path: "badges",
-    color: "#fffde7"
-  }
-];
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Paper,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert
+} from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 const StudentPortal = () => {
+  const [assignments, setAssignments] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [submissionContent, setSubmissionContent] = useState("");
+  const [submitStatus, setSubmitStatus] = useState(""); // Success/Error message
   const navigate = useNavigate();
-  const handleLogout = () => navigate("/");
+
+  useEffect(() => {
+    fetchAssignments();
+  }, []);
+
+  const fetchAssignments = async () => {
+    try {
+      const res = await fetch("/api/assignments");
+      if (!res.ok) throw new Error("No assignments");
+      const data = await res.json();
+      setAssignments(data);
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      setAssignments([]); // Show empty table
+    }
+  };
+
+  const handleSubmit = async () => {
+    console.log("Submitting:", selectedAssignment.id, submissionContent); // DEBUG
+    try {
+      const res = await fetch(`/api/assignments/${selectedAssignment.id}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: 2, // student1@school.com
+          content: submissionContent
+        })
+      });
+
+      console.log("Submit response:", res.status); // DEBUG
+
+      if (res.ok) {
+        setOpen(false);
+        setSubmissionContent("");
+        setSubmitStatus("✅ Submitted successfully! Teacher can now grade it.");
+        fetchAssignments(); // Refresh list
+        setTimeout(() => setSubmitStatus(""), 5000); // Hide message
+      } else {
+        setSubmitStatus("❌ Submission failed. Check backend.");
+      }
+    } catch (error) {
+      console.error("Error submitting:", error);
+      setSubmitStatus("❌ Network error. Is backend running?");
+    }
+  };
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f6f8fb", position: "relative" }}>
-      <Box sx={bgShapeStyle} />
-      <Box sx={bgShapeStyle2} />
-      <AppBar position="static" color="secondary" elevation={3}>
-        <Toolbar>
-          <Typography variant="h5" sx={{ flexGrow: 1, fontWeight: 700 }}>Student Portal</Typography>
-          <Button color="inherit" onClick={handleLogout}>Logout</Button>
-        </Toolbar>
-      </AppBar>
-      <Box display="flex" flexDirection="column" alignItems="center" pb={8} pt={8} sx={{ zIndex: 1, position: "relative" }}>
-        <Typography variant="h4" sx={{ mb: 5, fontWeight: 700, color: "#43a047" }}>
-          What would you like to do?
-        </Typography>
-        <Grid container spacing={5} justifyContent="center" alignItems="center" maxWidth={950}>
-          {portalOptions.map((option, idx) => (
-            <Grid item xs={12} sm={6} md={4} key={idx}>
-              <Card
-                sx={{
-                  bgcolor: option.color,
-                  borderRadius: 4,
-                  boxShadow: 7,
-                  position: 'relative',
-                  transition: "transform 0.25s",
-                  ":hover": { transform: "scale(1.07)", boxShadow: 16 }
-                }}
-              >
-                <CardActionArea onClick={() => navigate(`/student/${option.path}`)}>
-                  <CardContent sx={{ textAlign: "center", py: 4 }}>
-                    {option.icon}
-                    <Typography variant="h6" sx={{ mt: 2, fontWeight: 600 }}>{option.label}</Typography>
-                    <Typography variant="body2" sx={{ mt: 2, color: "#455a64" }}>{option.description}</Typography>
-                  </CardContent>
-                </CardActionArea>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-        {/* Nested portal routes render here */}
-        <Box sx={{ width: "100%", mt: 8 }}>
-          <Outlet />
-        </Box>
-      </Box>
+    <Box sx={{ p: 4, maxWidth: 1200, mx: "auto" }}>
+      <Typography variant="h4" fontWeight="bold" mb={4}>
+        Available Assignments
+      </Typography>
+
+      {/* Success/Error Alert */}
+      {submitStatus && (
+        <Alert severity={submitStatus.includes("✅") ? "success" : "error"} sx={{ mb: 3 }}>
+          {submitStatus}
+        </Alert>
+      )}
+
+      <TableContainer component={Paper} sx={{ boxShadow: 3 }}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "1.1rem" }}>Title</TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "1.1rem" }}>Description</TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "1.1rem" }}>Due Date</TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "1.1rem" }}>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {assignments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} sx={{ textAlign: "center", py: 4 }}>
+                  <Typography>No assignments available. Ask teacher to create one.</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              assignments.map((assignment) => (
+                <TableRow key={assignment.id} hover>
+                  <TableCell sx={{ fontWeight: 500 }}>{assignment.title}</TableCell>
+                  <TableCell>{assignment.description}</TableCell>
+                  <TableCell>{assignment.dueDate}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => {
+                        setSelectedAssignment(assignment);
+                        setOpen(true);
+                        setSubmitStatus("");
+                      }}
+                    >
+                      Submit
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Submission Dialog */}
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Submit Assignment: {selectedAssignment?.title}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body1" mb={2}>
+            {selectedAssignment?.description}
+          </Typography>
+          <TextField
+            label="Your Submission"
+            multiline
+            rows={6}
+            fullWidth
+            value={submissionContent}
+            onChange={(e) => setSubmissionContent(e.target.value)}
+            placeholder="Write your answer here..."
+            margin="normal"
+            required
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={!submissionContent.trim()}
+          >
+            Submit Assignment
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
